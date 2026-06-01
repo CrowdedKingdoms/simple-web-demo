@@ -3,6 +3,11 @@
 export const MANAGEMENT_URL =
   import.meta.env.VITE_MANAGEMENT_API_URL ?? '/mgmt-api';
 
+/** Always set explicitly — older CrowdyJS on GitHub does not append /graphql. */
+export const MANAGEMENT_GRAPHQL_URL =
+  import.meta.env.VITE_MANAGEMENT_GRAPHQL_URL ??
+  `${MANAGEMENT_URL.replace(/\/$/, '')}/graphql`;
+
 export const GAME_HTTP_URL =
   import.meta.env.VITE_GAME_API_HTTP_URL ??
   'https://game.dev1.dev.cks-env.com/graphql';

@@ -5,8 +5,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CROWDY_ROOT="$(dirname "$ROOT")/CrowdyJS"
 
 if [[ ! -f "$CROWDY_ROOT/package.json" ]]; then
-  echo "Cloning CrowdyJS (file: dependency)..."
-  git clone --depth 1 https://github.com/CrowdedKingdoms/CrowdyJS.git "$CROWDY_ROOT"
+  CROWDYJS_REPO="${CROWDYJS_REPO:-https://github.com/CrowdedKingdoms/CrowdyJS.git}"
+  echo "Cloning CrowdyJS from ${CROWDYJS_REPO} (file: dependency)..."
+  git clone --depth 1 "$CROWDYJS_REPO" "$CROWDY_ROOT"
 fi
 
 echo "Building CrowdyJS..."

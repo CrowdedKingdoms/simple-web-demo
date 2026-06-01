@@ -2,9 +2,13 @@
   command = "bash scripts/netlify-build.sh"
   publish = "dist"
 
+# CrowdyJS is cloned at build time (see scripts/netlify-build.sh).
+# Forking this repo is fine — you do not need CrowdyJS in the same GitHub repo.
+# Optional: set CROWDYJS_REPO to your CrowdyJS fork URL if the upstream clone fails.
 [build.environment]
   NODE_VERSION = "20"
   VITE_MANAGEMENT_API_URL = "/mgmt-api"
+  VITE_MANAGEMENT_GRAPHQL_URL = "/mgmt-api/graphql"
 
 # Proxy Management API — force=true so SPA catch-all does not swallow these paths.
 [[redirects]]

@@ -9,6 +9,7 @@ import {
   APP_ID,
   GAME_HTTP_URL,
   GAME_WS_URL,
+  MANAGEMENT_GRAPHQL_URL,
   MANAGEMENT_URL,
 } from '@/config';
 import { voxelToCell } from '@/game/world/coordinates';
@@ -70,6 +71,7 @@ export class CrowdySession {
   private constructor() {
     this.client = createCrowdyClient({
       managementUrl: MANAGEMENT_URL,
+      managementGraphqlEndpoint: MANAGEMENT_GRAPHQL_URL,
       httpUrl: GAME_HTTP_URL,
       wsUrl: GAME_WS_URL,
       tokenStore: new BrowserLocalStorageTokenStore('cks-canvas-token'),
@@ -114,7 +116,7 @@ export class CrowdySession {
       gameOk: null,
     };
     try {
-      const mgmtRes = await fetch(`${MANAGEMENT_URL}/graphql`, {
+      const mgmtRes = await fetch(MANAGEMENT_GRAPHQL_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: '{ __typename }' }),
