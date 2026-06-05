@@ -12,7 +12,7 @@ export function randomSpawn(seed: string): ShipState {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
   const angle = ((hash % 360) * Math.PI) / 180;
-  const dist = 200 + (hash % 500);
+  const dist = 28 + (hash % 52);
   return {
     worldX: BATTLE_ARENA_CENTER_X + Math.cos(angle) * dist,
     worldY: ((hash >> 8) % 120) - 60,

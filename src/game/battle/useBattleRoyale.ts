@@ -23,7 +23,12 @@ import {
 import { clampSpeed, distance3, shipForward } from '@/game/battle/flight';
 import { distanceToZoneEdge, getMatchStartMs, getZoneState } from '@/game/battle/zone';
 import { randomSpawn } from '@/game/battle/spawn';
-import { listBattlePeers, postBattlePresence } from '@/game/battle/battlePresence';
+import {
+  listBattleFires,
+  listBattlePeers,
+  postBattleFire,
+  postBattlePresence,
+} from '@/game/battle/battlePresence';
 import {
   EVENT_FIRE,
   EVENT_HIT,
@@ -129,6 +134,7 @@ export function useBattleRoyale() {
         sequenceNumber: eventSeqRef.current % 256,
         distance: 8,
       });
+      void postBattleFire(payload);
       bump();
     },
     [session, bump],
@@ -237,6 +243,23 @@ export function useBattleRoyale() {
             });
           }
           remoteRef.current = next;
+
+          for (const fire of await listBattleFires()) {
+            if (fire.ownerUuid === session.actorUuid) continue;
+            if (projectilesRef.current.some((p) => p.id === fire.id)) continue;
+            projectilesRef.current.push({
+              id: fire.id,
+              ownerUuid: fire.ownerUuid,
+              x: fire.x,
+              y: fire.y ?? 0,
+              z: fire.z ?? 0,
+              vx: fire.vx,
+              vy: fire.vy ?? 0,
+              vz: fire.vz ?? 0,
+              bornAt: fire.firedAt,
+            });
+          }
+
           bump();
         } catch {
           // Presence relay is best-effort in dev

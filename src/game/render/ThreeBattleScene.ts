@@ -17,10 +17,23 @@ function hexColor(hex: string): number {
   return Number.parseInt(hex.replace('#', ''), 16);
 }
 
-function createArwingMesh(color: number, accent: number): THREE.Group {
+function createArwingMesh(
+  color: number,
+  accent: number,
+  opts?: { fog?: boolean },
+): THREE.Group {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshLambertMaterial({ color, flatShading: true });
-  const accentMat = new THREE.MeshLambertMaterial({ color: accent, flatShading: true });
+  const bodyMat = new THREE.MeshLambertMaterial({
+    color,
+    flatShading: true,
+    fog: opts?.fog ?? true,
+  });
+  const accentMat = new THREE.MeshLambertMaterial({
+    color,
+    flatShading: true,
+    fog: opts?.fog ?? true,
+  });
+  accentMat.color.setHex(accent);
 
   const fuselage = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.6, 4), bodyMat);
   fuselage.rotation.x = Math.PI / 2;
@@ -48,7 +61,11 @@ function createArwingMesh(color: number, accent: number): THREE.Group {
 
   const canopy = new THREE.Mesh(
     new THREE.SphereGeometry(0.22, 6, 4),
-    new THREE.MeshLambertMaterial({ color: 0x88ccff, flatShading: true }),
+    new THREE.MeshLambertMaterial({
+      color: 0x88ccff,
+      flatShading: true,
+      fog: opts?.fog ?? true,
+    }),
   );
   canopy.position.set(0, 0.14, -0.35);
   canopy.scale.set(1, 0.6, 1.2);
@@ -112,7 +129,10 @@ export class ThreeBattleScene {
   private readonly localShip: THREE.Group;
   private readonly exhaust: THREE.Mesh;
   private readonly zoneMesh: THREE.Mesh;
-  private readonly remoteMeshes = new Map<string, THREE.Group>();
+  private readonly remoteMeshes = new Map<
+    string,
+    { rig: THREE.Group; ship: THREE.Group; beacon: THREE.Mesh }
+  >();
   private readonly laserMeshes = new Map<string, THREE.Group>();
   private readonly localLaserMeshes = new Map<string, THREE.Group>();
   private readonly localFx: THREE.Group;
@@ -131,7 +151,7 @@ export class ThreeBattleScene {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(N64_PALETTE.sky);
-    this.scene.fog = new THREE.FogExp2(N64_PALETTE.fog, 0.0018);
+    this.scene.fog = new THREE.FogExp2(N64_PALETTE.fog, 0.00045);
 
     this.camera = new THREE.PerspectiveCamera(58, w / h, 0.1, 4000);
     this.camera.position.set(0, 1.4, 4.2);
@@ -250,7 +270,7 @@ export class ThreeBattleScene {
     const bolt = new THREE.Group();
     const core = new THREE.Mesh(
       new THREE.BoxGeometry(0.25, 0.25, 5),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, fog: false }),
     );
     core.position.z = -2.5;
     const glow = new THREE.Mesh(
@@ -260,6 +280,7 @@ export class ThreeBattleScene {
         transparent: true,
         opacity: 0.9,
         toneMapped: false,
+        fog: false,
       }),
     );
     glow.position.z = -2.75;
@@ -301,28 +322,48 @@ export class ThreeBattleScene {
     const seen = new Set<string>();
     for (const remote of remotes) {
       seen.add(remote.uuid);
-      let mesh = this.remoteMeshes.get(remote.uuid);
-      if (!mesh) {
+      let entry = this.remoteMeshes.get(remote.uuid);
+      if (!entry) {
         const color = hexColor(remote.color);
-        mesh = createArwingMesh(color, 0x2244aa);
-        mesh.scale.setScalar(1.8);
-        this.arena.add(mesh);
-        this.remoteMeshes.set(remote.uuid, mesh);
+        const rig = new THREE.Group();
+        const ship = createArwingMesh(color, 0x2244aa, { fog: false });
+        const beacon = new THREE.Mesh(
+          new THREE.SphereGeometry(2.4, 10, 8),
+          new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.85,
+            fog: false,
+            toneMapped: false,
+          }),
+        );
+        beacon.position.set(0, 0, -1.2);
+        rig.add(ship, beacon);
+        this.arena.add(rig);
+        entry = { rig, ship, beacon };
+        this.remoteMeshes.set(remote.uuid, entry);
       }
       const s = remote.ship;
-      mesh.visible = s.alive;
-      mesh.position.set(
-        s.worldX - local.worldX,
-        s.worldY - local.worldY,
-        s.worldZ - local.worldZ,
+      const dx = s.worldX - local.worldX;
+      const dy = s.worldY - local.worldY;
+      const dz = s.worldZ - local.worldZ;
+      const dist = Math.hypot(dx, dy, dz);
+      const visualScale = Math.max(3, Math.min(14, 2 + dist * 0.045));
+
+      entry.rig.visible = s.alive;
+      entry.rig.position.set(dx, dy, dz);
+      entry.rig.rotation.order = 'YXZ';
+      entry.rig.rotation.y = s.yaw;
+      entry.rig.rotation.x = s.pitch;
+      entry.ship.scale.setScalar(visualScale);
+      entry.beacon.scale.setScalar(Math.max(1, visualScale * 0.35));
+      (entry.beacon.material as THREE.MeshBasicMaterial).color.setHex(
+        hexColor(remote.color),
       );
-      mesh.rotation.order = 'YXZ';
-      mesh.rotation.y = s.yaw - local.yaw;
-      mesh.rotation.x = s.pitch - local.pitch;
     }
-    for (const [uuid, mesh] of this.remoteMeshes) {
+    for (const [uuid, entry] of this.remoteMeshes) {
       if (!seen.has(uuid)) {
-        this.arena.remove(mesh);
+        this.arena.remove(entry.rig);
         this.remoteMeshes.delete(uuid);
       }
     }
