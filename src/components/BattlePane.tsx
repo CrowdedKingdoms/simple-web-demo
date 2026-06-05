@@ -46,14 +46,17 @@ export function BattlePane({
         ref={canvasRef}
         width={width}
         height={height}
-        onPointerMove={(e) => {
-          const world = pointerToWorld(e.clientX, e.clientY);
-          if (world) onAim?.(world.x, world.y);
-        }}
+        tabIndex={0}
+        aria-label="Star Fox Royale flight arena"
         onPointerDown={(e) => {
+          canvasRef.current?.focus();
           const world = pointerToWorld(e.clientX, e.clientY);
           if (world) onAim?.(world.x, world.y);
           onFire?.();
+        }}
+        onPointerMove={(e) => {
+          const world = pointerToWorld(e.clientX, e.clientY);
+          if (world) onAim?.(world.x, world.y);
         }}
       />
     </div>

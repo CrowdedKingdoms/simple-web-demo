@@ -59,10 +59,17 @@ export function useBattleRoyale() {
   const lastFrameRef = useRef(performance.now());
   const hitProjectilesRef = useRef(new Set<string>());
   const matchStartRef = useRef(getMatchStartMs());
+  const everHadOpponentRef = useRef(false);
+  const matchStatusRef = useRef<'fighting' | 'victory' | 'eliminated'>('fighting');
 
   const [tick, setTick] = useState(0);
   const [events, setEvents] = useState<string[]>([]);
   const [matchStatus, setMatchStatus] = useState<'fighting' | 'victory' | 'eliminated'>('fighting');
+
+  const setMatch = useCallback((status: 'fighting' | 'victory' | 'eliminated') => {
+    matchStatusRef.current = status;
+    setMatchStatus(status);
+  }, []);
 
   const bump = useCallback(() => setTick((t) => t + 1), []);
 
@@ -121,7 +128,7 @@ export function useBattleRoyale() {
         ship.hp = Math.max(0, ship.hp - payload.damage);
         if (ship.hp <= 0) {
           ship.alive = false;
-          setMatchStatus('eliminated');
+          setMatch('eliminated');
         }
         bump();
         return;
@@ -206,24 +213,35 @@ export function useBattleRoyale() {
     };
   }, [session, bump, applyHit]);
 
+  const trackKey = useCallback((e: KeyboardEvent, down: boolean) => {
+    const codeMap: Record<string, string> = {
+      KeyW: 'w',
+      KeyA: 'a',
+      KeyS: 's',
+      KeyD: 'd',
+    };
+    const key = codeMap[e.code] ?? e.key.toLowerCase();
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
+      if (down) keysRef.current.add(key);
+      else keysRef.current.delete(key);
+      e.preventDefault();
+    }
+    if (down && (e.key === ' ' || e.code === 'Space')) {
+      e.preventDefault();
+      void fireProjectile(localShipRef.current);
+    }
+  }, [fireProjectile]);
+
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      keysRef.current.add(e.key.toLowerCase());
-      if (e.key === ' ' || e.key === 'Spacebar') {
-        e.preventDefault();
-        void fireProjectile(localShipRef.current);
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      keysRef.current.delete(e.key.toLowerCase());
-    };
+    const onKeyDown = (e: KeyboardEvent) => trackKey(e, true);
+    const onKeyUp = (e: KeyboardEvent) => trackKey(e, false);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [fireProjectile]);
+  }, [trackKey]);
 
   useEffect(() => {
     const loop = (now: number) => {
@@ -237,15 +255,17 @@ export function useBattleRoyale() {
         velocityRef.current = { vx: 0, vy: 0 };
         projectilesRef.current = [];
         hitProjectilesRef.current.clear();
-        setMatchStatus('fighting');
+        everHadOpponentRef.current = false;
+        setMatch('fighting');
       }
 
       const ship = localShipRef.current;
       const zone = getZoneState();
       const keys = keysRef.current;
       const vel = velocityRef.current;
+      const status = matchStatusRef.current;
 
-      if (ship.alive && matchStatus === 'fighting') {
+      if (ship.alive && status !== 'eliminated') {
         let thrust = 0;
         if (keys.has('w')) thrust += 1;
         if (keys.has('s')) thrust -= 0.6;
@@ -272,7 +292,7 @@ export function useBattleRoyale() {
           ship.hp = Math.max(0, ship.hp - (BATTLE_ZONE_DAMAGE_PER_SEC * dt) / 60);
           if (ship.hp <= 0) {
             ship.alive = false;
-            setMatchStatus('eliminated');
+            setMatch('eliminated');
           }
         }
       }
@@ -280,8 +300,16 @@ export function useBattleRoyale() {
       viewportRef.current.followActor(ship.worldX, ship.worldY);
 
       const aliveRemotes = [...remoteRef.current.values()].filter((r) => r.ship.alive);
-      if (ship.alive && aliveRemotes.length === 0 && matchStatus === 'fighting') {
-        setMatchStatus('victory');
+      if (remoteRef.current.size > 0) {
+        everHadOpponentRef.current = true;
+      }
+      if (
+        ship.alive &&
+        everHadOpponentRef.current &&
+        aliveRemotes.length === 0 &&
+        status === 'fighting'
+      ) {
+        setMatch('victory');
       }
 
       const projectiles = projectilesRef.current;
@@ -330,7 +358,7 @@ export function useBattleRoyale() {
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [session, bump, applyHit, matchStatus]);
+  }, [session, bump, applyHit, setMatch]);
 
   const handleAim = (worldX: number, worldY: number) => {
     const ship = localShipRef.current;

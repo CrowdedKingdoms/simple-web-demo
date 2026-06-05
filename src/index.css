@@ -366,6 +366,12 @@ body {
   border-radius: 8px;
   display: block;
   width: 100%;
+  outline: none;
+}
+
+.battle-pane canvas:focus {
+  border-color: #4a6fa5;
+  box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.35);
 }
 
 .play-layout {

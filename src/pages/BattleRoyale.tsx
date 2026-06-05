@@ -19,7 +19,10 @@ export function BattleRoyale() {
       <header className="play-header">
         <Link to="/">← Tutorial</Link>
         <h1>Star Fox Royale</h1>
-        <p>Last fighter in the shrinking sector wins. WASD thrust · mouse aim · click or space to fire.</p>
+        <p>
+          Click the arena first, then fly: <strong>W</strong> boost · <strong>A/D</strong> turn ·{' '}
+          <strong>S</strong> brake · mouse aim · click or space to fire.
+        </p>
       </header>
       <div className="play-body">
         <div className="play-main">
