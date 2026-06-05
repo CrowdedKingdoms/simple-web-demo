@@ -11,6 +11,7 @@ import { Chapter07 } from '@/chapters/ch07-viewport/Chapter07';
 import { Chapter08 } from '@/chapters/ch08-collab/Chapter08';
 import { Chapter09 } from '@/chapters/ch09-full/Chapter09';
 import { FullGame } from '@/chapters/ch09-full/FullGame';
+import { BattleRoyale } from '@/pages/BattleRoyale';
 
 const CHAPTER_MAP: Record<number, ComponentType> = {
   1: Chapter01,
@@ -37,7 +38,8 @@ export function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/chapter/:n" element={<ChapterRoute />} />
-      <Route path="/play" element={<FullGame />} />
+      <Route path="/play" element={<BattleRoyale />} />
+      <Route path="/canvas" element={<FullGame />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

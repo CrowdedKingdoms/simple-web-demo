@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "node scripts/ensure-crowdyjs.mjs",
     "prebuild": "node scripts/ensure-crowdyjs.mjs",
-    "dev": "vite",
+    "dev": "vite --port 5180",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -15,9 +15,11 @@
   },
   "dependencies": {
     "@crowdedkingdomstudios/crowdyjs": "file:../CrowdyJS",
+    "@types/three": "^0.184.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.6.0"
+    "react-router-dom": "^7.6.0",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",

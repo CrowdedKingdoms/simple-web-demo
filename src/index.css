@@ -269,6 +269,103 @@ body {
   color: #fff;
   border-radius: 8px;
   text-decoration: none;
+  margin-right: 0.75rem;
+}
+
+.play-link.secondary {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #3d5a80;
+  color: #7eb8ff;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.battle-layout {
+  max-width: 1100px;
+}
+
+.battle-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #12121f;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+}
+
+.hud-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 72px;
+}
+
+.hud-stat .label {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.hud-stat .value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.battle-banner {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.battle-banner.victory {
+  background: rgba(46, 204, 113, 0.2);
+  border: 1px solid #2ecc71;
+}
+
+.battle-banner.eliminated {
+  background: rgba(231, 76, 60, 0.2);
+  border: 1px solid #e74c3c;
+}
+
+.battle-sidebar {
+  font-size: 0.85rem;
+}
+
+.battle-user {
+  color: #aaa;
+  margin-top: 0;
+}
+
+.battle-hint {
+  color: #888;
+  line-height: 1.4;
+}
+
+.battle-log {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.battle-log li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #1f1f2e;
+  color: #777;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.battle-pane canvas {
+  cursor: crosshair;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  display: block;
+  width: 100%;
 }
 
 .play-layout {

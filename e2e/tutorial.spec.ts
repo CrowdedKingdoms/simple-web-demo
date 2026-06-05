@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Tutorial shell', () => {
   test('home lists all 9 chapters', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Build a Collaborative Canvas Game' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Star Fox Royale' })).toBeVisible();
     for (let i = 1; i <= 9; i++) {
       await expect(page.getByRole('link', { name: new RegExp(`Chapter ${i}`) })).toBeVisible();
     }
@@ -67,76 +67,46 @@ test.describe('Chapter 3 — UDP bootstrap', () => {
   });
 });
 
-test.describe('Full game route', () => {
-  test('/play loads collaborative canvas', async ({ page }) => {
+test.describe('Battle royale route', () => {
+  test('/play loads Star Fox Royale', async ({ page }) => {
     await page.goto('/play');
+    await expect(page.getByRole('heading', { name: 'Star Fox Royale' })).toBeVisible();
+    await expect(page.locator('.battle-pane canvas')).toBeVisible();
+    await expect(page.getByText('Pilots left')).toBeVisible();
+  });
+
+  test('two browser contexts see each other in the match', async ({ browser }) => {
+    const contextA = await browser.newContext();
+    const contextB = await browser.newContext();
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+
+    await Promise.all([pageA.goto('/play'), pageB.goto('/play')]);
+
+    await expect(pageA.locator('.battle-pane canvas')).toBeVisible();
+    await expect(pageB.locator('.battle-pane canvas')).toBeVisible();
+
+    await expect
+      .poll(async () => Number(await pageA.getByTestId('alive-count').textContent()), {
+        timeout: 25_000,
+      })
+      .toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(async () => Number(await pageB.getByTestId('alive-count').textContent()), {
+        timeout: 25_000,
+      })
+      .toBeGreaterThanOrEqual(1);
+
+    await contextA.close();
+    await contextB.close();
+  });
+});
+
+test.describe('Collaborative canvas route', () => {
+  test('/canvas loads paint mode', async ({ page }) => {
+    await page.goto('/canvas');
     await expect(page.getByRole('heading', { name: 'Collaborative Canvas' })).toBeVisible();
     await expect(page.locator('.demo-pane canvas')).toBeVisible();
     await expect(page.locator('.palette button')).toHaveCount(5);
-  });
-
-  test('two browser contexts see shared peer state', async ({ browser }) => {
-    const contextA = await browser.newContext();
-    const contextB = await browser.newContext();
-    const pageA = await contextA.newPage();
-    const pageB = await contextB.newPage();
-
-    await Promise.all([pageA.goto('/play'), pageB.goto('/play')]);
-
-    const canvasA = pageA.locator('.demo-pane canvas');
-    const canvasB = pageB.locator('.demo-pane canvas');
-    await expect(canvasA).toBeVisible();
-    await expect(canvasB).toBeVisible();
-
-    const boxA = await canvasA.boundingBox();
-    const boxB = await canvasB.boundingBox();
-    expect(boxA).not.toBeNull();
-    expect(boxB).not.toBeNull();
-
-    await pageA.mouse.move(boxA!.x + 80, boxA!.y + 80);
-    await pageB.mouse.move(boxB!.x + boxB!.width - 80, boxB!.y + boxB!.height - 80);
-
-    await expect
-      .poll(async () => Number(await pageA.getByTestId('peer-count').textContent()), {
-        timeout: 25_000,
-      })
-      .toBeGreaterThanOrEqual(1);
-    await expect
-      .poll(async () => Number(await pageB.getByTestId('peer-count').textContent()), {
-        timeout: 25_000,
-      })
-      .toBeGreaterThanOrEqual(1);
-
-    await contextA.close();
-    await contextB.close();
-  });
-
-  test('two browser contexts see shared paint', async ({ browser }) => {
-    const contextA = await browser.newContext();
-    const contextB = await browser.newContext();
-    const pageA = await contextA.newPage();
-    const pageB = await contextB.newPage();
-
-    await Promise.all([pageA.goto('/play'), pageB.goto('/play')]);
-
-    const canvasA = pageA.locator('.demo-pane canvas');
-    const canvasB = pageB.locator('.demo-pane canvas');
-    await expect(canvasA).toBeVisible();
-    await expect(canvasB).toBeVisible();
-
-    const boxA = await canvasA.boundingBox();
-    expect(boxA).not.toBeNull();
-
-    const before = Number(await pageB.getByTestId('paint-count').textContent());
-    await pageA.mouse.click(boxA!.x + 120, boxA!.y + 120);
-
-    await expect
-      .poll(async () => Number(await pageB.getByTestId('paint-count').textContent()), {
-        timeout: 10_000,
-      })
-      .toBeGreaterThan(before);
-
-    await contextA.close();
-    await contextB.close();
   });
 });

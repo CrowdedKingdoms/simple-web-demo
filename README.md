@@ -23,8 +23,8 @@ cks-project-root/
 
 ```text
 ManagementApiUrl=https://api.dev.crowdedkingdoms.com   (proxied as /mgmt-api in local dev)
-GameApiHttpUrl=https://game.dev2.dev.cks-env.com/graphql
-GameApiWsUrl=wss://game.dev2.dev.cks-env.com/graphql
+GameApiHttpUrl=https://game.dev1.dev.cks-env.com/graphql
+GameApiWsUrl=wss://game.dev1.dev.cks-env.com/graphql
 AppId=1
 OrgId=1
 ```

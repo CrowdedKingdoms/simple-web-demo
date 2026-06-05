@@ -5,13 +5,17 @@ export function Home() {
   return (
     <div className="home">
       <header>
-        <h1>Build a Collaborative Canvas Game</h1>
+        <h1>Star Fox Royale</h1>
         <p>
-          An interactive tutorial for Crowded Kingdoms — each chapter adds one
-          working piece until you have a multiplayer pixel canvas.
+          A Star Fox–style space battle royale on Crowded Kingdoms — blast rivals,
+          dodge the shrinking sector, and be the last fighter flying. The chapters
+          below walk through how it was built.
         </p>
         <Link to="/play" className="play-link big">
-          Jump to full game →
+          Launch battle royale →
+        </Link>
+        <Link to="/canvas" className="play-link secondary">
+          Open collaborative canvas →
         </Link>
       </header>
       <ol className="chapter-list">

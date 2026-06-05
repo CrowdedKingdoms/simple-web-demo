@@ -12,8 +12,13 @@ export class ActorSender {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private sequenceNumber = 0;
   private provider: PoseProvider | null = null;
+  private stateEncoder: (pose: ActorPose) => string = encodeActorState;
 
   constructor(private readonly session: CrowdySession) {}
+
+  setStateEncoder(encoder: (pose: ActorPose) => string): void {
+    this.stateEncoder = encoder;
+  }
 
   setProvider(provider: PoseProvider | null): void {
     this.provider = provider;
@@ -44,7 +49,7 @@ export class ActorSender {
     const seq = this.nextSeq();
     await this.session.sendActorUpdate({
       chunk,
-      state: encodeActorState(pose),
+      state: this.stateEncoder(pose),
       sequenceNumber: seq,
       distance: 8,
       decayRate: 1,
