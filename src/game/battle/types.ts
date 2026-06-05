@@ -44,5 +44,6 @@ export interface BattleSceneSnapshot {
   remoteShips: RemoteShip[];
   projectiles: Projectile[];
   zone: import('@/game/battle/zone').ZoneState;
+  throttle: number;
   tick: number;
 }

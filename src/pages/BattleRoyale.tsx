@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { BattlePane } from '@/components/BattlePane';
 import { BattleRadar } from '@/components/BattleRadar';
+import { BattleThrottle } from '@/components/BattleThrottle';
 import { useBattleRoyale } from '@/game/battle/useBattleRoyale';
 import { CrowdySession } from '@/game/session/CrowdySession';
 
@@ -21,15 +22,20 @@ export function BattleRoyale() {
         <Link to="/">← Tutorial</Link>
         <h1>Star Fox Royale</h1>
         <p>
-          N64 open-sector flight — click arena to focus: <strong>W</strong> boost ·{' '}
-          <strong>A/D</strong> bank · <strong>↑/↓</strong> climb/dive · hold <strong>Space</strong>{' '}
-          or <strong>click</strong> to laser
+          Star Fox flight: <strong>mouse</strong> or <strong>A/D · ←/→</strong> steer ·{' '}
+          <strong>W/S · ↑/↓</strong> throttle · hold <strong>Space</strong> or <strong>click</strong>{' '}
+          to laser (Esc unlocks mouse)
         </p>
       </header>
       <div className="play-body">
         <div className="play-main">
           <div className="battle-viewport">
-            <BattlePane getSnapshot={game.getSnapshot} setFiring={game.setFiring} />
+            <BattlePane
+              getSnapshot={game.getSnapshot}
+              setFiring={game.setFiring}
+              applySteer={game.applySteer}
+            />
+            <BattleThrottle throttle={game.throttle} />
             <BattleRadar
               localShip={game.localShip}
               remoteShips={game.remoteShips}
@@ -66,8 +72,9 @@ export function BattleRoyale() {
         <aside className="battle-sidebar">
           <p className="battle-user">{session.user?.email ?? 'Connecting…'}</p>
           <p className="battle-hint">
-            Your Arwing stays centered — the nebula scrolls past like Star Fox 64. Use the sector
-            radar (top-right) for rival bearings; colored arrows point toward other pilots.
+            Your Arwing stays centered and always flies forward — the nebula scrolls past like Star
+            Fox 64. Steer with the mouse (click arena to lock cursor) or A/D. Throttle with W/S or
+            ↑/↓ down to a crawl. Use the sector radar (top-right) for rival bearings.
           </p>
           <ol className="battle-log">
             {game.events.slice(-8).map((e) => (

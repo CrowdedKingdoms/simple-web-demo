@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { ShipState } from '@/game/battle/shipState';
 
 export interface Vec3 {
@@ -6,14 +7,16 @@ export interface Vec3 {
   z: number;
 }
 
-/** Unit forward vector from yaw (Y) and pitch (X) — Star Fox flies into -Z. */
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _forward = new THREE.Vector3();
+
+/**
+ * Unit forward vector — matches playerRig YXZ rotation with nose along local -Z.
+ */
 export function shipForward(ship: Pick<ShipState, 'yaw' | 'pitch'>): Vec3 {
-  const cp = Math.cos(ship.pitch);
-  return {
-    x: Math.sin(ship.yaw) * cp,
-    y: Math.sin(ship.pitch),
-    z: -Math.cos(ship.yaw) * cp,
-  };
+  _euler.set(ship.pitch, ship.yaw, 0, 'YXZ');
+  _forward.set(0, 0, -1).applyEuler(_euler);
+  return { x: _forward.x, y: _forward.y, z: _forward.z };
 }
 
 export function addScaled(out: Vec3, dir: Vec3, scale: number): Vec3 {

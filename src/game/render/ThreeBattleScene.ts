@@ -243,7 +243,7 @@ export class ThreeBattleScene {
   }
 
   private draw(snapshot: BattleSceneSnapshot): void {
-    const { localUuid, localShip, remoteShips, projectiles, zone } = snapshot;
+    const { localUuid, localShip, remoteShips, projectiles, zone, throttle } = snapshot;
 
     this.playerRig.rotation.order = 'YXZ';
     this.playerRig.rotation.y = localShip.yaw;
@@ -255,7 +255,8 @@ export class ThreeBattleScene {
     this.zoneMesh.position.set(zone.centerX, 0, zone.centerZ);
     this.zoneMesh.scale.setScalar(zone.radius);
 
-    this.boostGlow = 0.35 + Math.sin(performance.now() * 0.02) * 0.15;
+    const thrust = 0.25 + throttle * 0.85;
+    this.boostGlow = thrust + Math.sin(performance.now() * 0.02) * 0.12 * throttle;
     this.exhaust.scale.set(1, 1, this.boostGlow);
     this.localShip.rotation.z = Math.sin(performance.now() * 0.008) * 0.04;
 

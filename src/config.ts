@@ -52,9 +52,19 @@ export const BATTLE_ZONE_DAMAGE_PER_SEC = 10;
 export const BATTLE_SHIP_MAX_HP = 100;
 export const BATTLE_SHOT_DAMAGE = 14;
 export const BATTLE_FIRE_COOLDOWN_MS = 200;
-export const BATTLE_SHIP_ACCEL = 0.55;
-export const BATTLE_SHIP_MAX_SPEED = 7;
-export const BATTLE_SHIP_DRAG = 0.92;
+/** Throttle range — 0% crawl to 100% max boost (Star Fox 64 style). */
+export const BATTLE_THROTTLE_MIN_SPEED = 0.35;
+export const BATTLE_THROTTLE_MAX_SPEED = 5.5;
+export const BATTLE_THROTTLE_DEFAULT = 0.55;
+export const BATTLE_THROTTLE_RATE = 0.022;
+/** @deprecated Use BATTLE_THROTTLE_MAX_SPEED */
+export const BATTLE_SHIP_CRUISE_SPEED = BATTLE_THROTTLE_MAX_SPEED;
+export const BATTLE_YAW_RATE = 0.05;
+export const BATTLE_PITCH_RATE = 0.038;
+export const BATTLE_MAX_PITCH = 0.78;
+export const BATTLE_MOUSE_SENSITIVITY = 0.0024;
+/** @deprecated Use BATTLE_SHIP_CRUISE_SPEED */
+export const BATTLE_SHIP_MAX_SPEED = BATTLE_SHIP_CRUISE_SPEED;
 export const BATTLE_PROJECTILE_SPEED = 22;
 export const BATTLE_PROJECTILE_LIFETIME_MS = 1800;
 export const BATTLE_LASER_MUZZLE_OFFSET = 3.5;

@@ -5,12 +5,17 @@ import { actorColorForUuid } from '@/game/render/CanvasRenderer';
 import {
   BATTLE_FIRE_COOLDOWN_MS,
   BATTLE_LASER_MUZZLE_OFFSET,
+  BATTLE_MAX_PITCH,
+  BATTLE_MOUSE_SENSITIVITY,
+  BATTLE_PITCH_RATE,
   BATTLE_PROJECTILE_LIFETIME_MS,
   BATTLE_PROJECTILE_SPEED,
-  BATTLE_SHIP_ACCEL,
-  BATTLE_SHIP_DRAG,
-  BATTLE_SHIP_MAX_SPEED,
+  BATTLE_THROTTLE_DEFAULT,
+  BATTLE_THROTTLE_MAX_SPEED,
+  BATTLE_THROTTLE_MIN_SPEED,
+  BATTLE_THROTTLE_RATE,
   BATTLE_SHOT_DAMAGE,
+  BATTLE_YAW_RATE,
   BATTLE_ZONE_DAMAGE_PER_SEC,
 } from '@/config';
 import { worldToChunkInput } from '@/game/world/coordinates';
@@ -20,7 +25,7 @@ import {
   shipStateToPose,
   type ShipState,
 } from '@/game/battle/shipState';
-import { clampSpeed, distance3, shipForward } from '@/game/battle/flight';
+import { distance3, shipForward } from '@/game/battle/flight';
 import { distanceToZoneEdge, getMatchStartMs, getZoneState } from '@/game/battle/zone';
 import { randomSpawn } from '@/game/battle/spawn';
 import {
@@ -61,7 +66,8 @@ export function useBattleRoyale() {
   const remoteRef = useRef(new Map<string, RemoteShip>());
   const projectilesRef = useRef<Projectile[]>([]);
   const keysRef = useRef(new Set<string>());
-  const velocityRef = useRef({ x: 0, y: 0, z: 0 });
+  const steerRef = useRef({ yaw: 0, pitch: 0 });
+  const throttleRef = useRef(BATTLE_THROTTLE_DEFAULT);
   const localShipRef = useRef<ShipState>(randomSpawn(session.actorUuid));
   const lastFireRef = useRef(0);
   const eventSeqRef = useRef(0);
@@ -285,16 +291,20 @@ export function useBattleRoyale() {
   const trackKey = useCallback((e: KeyboardEvent, down: boolean) => {
     const codeMap: Record<string, string> = {
       KeyW: 'w',
-      KeyA: 'a',
       KeyS: 's',
+      KeyA: 'a',
       KeyD: 'd',
       ArrowUp: 'up',
       ArrowDown: 'down',
-      KeyI: 'up',
-      KeyK: 'down',
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      KeyI: 'pitch_up',
+      KeyK: 'pitch_down',
+      KeyJ: 'left',
+      KeyL: 'right',
     };
     const key = codeMap[e.code] ?? e.key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'up', 'down'].includes(key)) {
+    if (['w', 's', 'a', 'd', 'up', 'down', 'left', 'right', 'pitch_up', 'pitch_down'].includes(key)) {
       if (down) keysRef.current.add(key);
       else keysRef.current.delete(key);
       e.preventDefault();
@@ -330,7 +340,8 @@ export function useBattleRoyale() {
       if (roundStart !== matchStartRef.current) {
         matchStartRef.current = roundStart;
         localShipRef.current = randomSpawn(session.actorUuid);
-        velocityRef.current = { x: 0, y: 0, z: 0 };
+        steerRef.current = { yaw: 0, pitch: 0 };
+        throttleRef.current = BATTLE_THROTTLE_DEFAULT;
         projectilesRef.current = [];
         hitProjectilesRef.current.clear();
         everHadOpponentRef.current = false;
@@ -340,7 +351,6 @@ export function useBattleRoyale() {
       const ship = localShipRef.current;
       const zone = getZoneState();
       const keys = keysRef.current;
-      let vel = velocityRef.current;
       const status = matchStatusRef.current;
 
       if (ship.alive && status !== 'eliminated') {
@@ -348,35 +358,37 @@ export function useBattleRoyale() {
           void fireProjectile(ship);
         }
 
-        let thrust = 0;
-        if (keys.has('w')) thrust += 1;
-        if (keys.has('s')) thrust -= 0.65;
-
-        if (keys.has('a')) ship.yaw -= 0.055 * dt;
-        if (keys.has('d')) ship.yaw += 0.055 * dt;
-        if (keys.has('up')) ship.pitch = Math.min(0.85, ship.pitch + 0.04 * dt);
-        if (keys.has('down')) ship.pitch = Math.max(-0.85, ship.pitch - 0.04 * dt);
-
-        if (thrust !== 0) {
-          const fwd = shipForward(ship);
-          vel = {
-            x: vel.x + fwd.x * BATTLE_SHIP_ACCEL * thrust * dt,
-            y: vel.y + fwd.y * BATTLE_SHIP_ACCEL * thrust * dt,
-            z: vel.z + fwd.z * BATTLE_SHIP_ACCEL * thrust * dt,
-          };
+        if (keys.has('a') || keys.has('left')) ship.yaw += BATTLE_YAW_RATE * dt;
+        if (keys.has('d') || keys.has('right')) ship.yaw -= BATTLE_YAW_RATE * dt;
+        if (keys.has('pitch_up')) {
+          ship.pitch = Math.min(BATTLE_MAX_PITCH, ship.pitch + BATTLE_PITCH_RATE * dt);
+        }
+        if (keys.has('pitch_down')) {
+          ship.pitch = Math.max(-BATTLE_MAX_PITCH, ship.pitch - BATTLE_PITCH_RATE * dt);
+        }
+        if (keys.has('w') || keys.has('up')) {
+          throttleRef.current = Math.min(1, throttleRef.current + BATTLE_THROTTLE_RATE * dt);
+        }
+        if (keys.has('s') || keys.has('down')) {
+          throttleRef.current = Math.max(0, throttleRef.current - BATTLE_THROTTLE_RATE * dt);
         }
 
-        vel = {
-          x: vel.x * BATTLE_SHIP_DRAG,
-          y: vel.y * BATTLE_SHIP_DRAG,
-          z: vel.z * BATTLE_SHIP_DRAG,
-        };
-        vel = clampSpeed(vel, BATTLE_SHIP_MAX_SPEED);
-        velocityRef.current = vel;
+        const steer = steerRef.current;
+        ship.yaw += steer.yaw;
+        ship.pitch = Math.max(
+          -BATTLE_MAX_PITCH,
+          Math.min(BATTLE_MAX_PITCH, ship.pitch + steer.pitch),
+        );
+        steerRef.current = { yaw: 0, pitch: 0 };
 
-        ship.worldX += vel.x * dt;
-        ship.worldY += vel.y * dt;
-        ship.worldZ += vel.z * dt;
+        const fwd = shipForward(ship);
+        const cruise =
+          BATTLE_THROTTLE_MIN_SPEED +
+          (BATTLE_THROTTLE_MAX_SPEED - BATTLE_THROTTLE_MIN_SPEED) * throttleRef.current;
+        const speed = cruise * dt;
+        ship.worldX += fwd.x * speed;
+        ship.worldY += fwd.y * speed;
+        ship.worldZ += fwd.z * speed;
 
         const edge = distanceToZoneEdge(ship.worldX, ship.worldZ, zone);
         if (edge < 0) {
@@ -457,6 +469,7 @@ export function useBattleRoyale() {
       remoteShips: [...remoteRef.current.values()],
       projectiles: projectilesRef.current,
       zone: getZoneState(),
+      throttle: throttleRef.current,
       tick,
     }),
     [session.actorUuid, tick],
@@ -466,6 +479,11 @@ export function useBattleRoyale() {
     firingRef.current = active;
     if (active) void fireProjectile(localShipRef.current);
   }, [fireProjectile]);
+
+  const applySteer = useCallback((dx: number, dy: number) => {
+    steerRef.current.yaw -= dx * BATTLE_MOUSE_SENSITIVITY;
+    steerRef.current.pitch -= dy * BATTLE_MOUSE_SENSITIVITY;
+  }, []);
 
   const zone = getZoneState();
   const remoteShips = [...remoteRef.current.values()];
@@ -483,6 +501,8 @@ export function useBattleRoyale() {
     matchStatus,
     events,
     setFiring,
+    applySteer,
+    throttle: throttleRef.current,
     tick,
   };
 }

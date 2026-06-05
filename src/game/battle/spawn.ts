@@ -17,7 +17,7 @@ export function randomSpawn(seed: string): ShipState {
     worldX: BATTLE_ARENA_CENTER_X + Math.cos(angle) * dist,
     worldY: ((hash >> 8) % 120) - 60,
     worldZ: BATTLE_ARENA_CENTER_Z + Math.sin(angle) * dist,
-    yaw: angle + Math.PI,
+    yaw: Math.atan2(Math.cos(angle), Math.sin(angle)),
     pitch: 0,
     hp: BATTLE_SHIP_MAX_HP,
     alive: true,
