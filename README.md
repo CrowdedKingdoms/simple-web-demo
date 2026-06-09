@@ -108,12 +108,12 @@ In **Site configuration → Environment variables** (scoped to **Build**), set a
 | Variable | Example |
 | --- | --- |
 | `VITE_ENV_HANDLE` | `e-zt0psk82q3bi` |
-| `VITE_GAME_API_HTTP_URL` | `https://game.e-zt0psk82q3bi.dev.cks-env.com/graphql` |
-| `VITE_GAME_API_WS_URL` | `wss://game.e-zt0psk82q3bi.dev.cks-env.com/graphql` |
+| `VITE_GAME_API_HTTP_URL` | `/game-api/graphql` (proxied — do not use the direct `game.*` URL on Netlify) |
+| `VITE_GAME_API_WS_URL` | `wss://game.e-zt0psk82q3bi.dev.cks-env.com/graphql` (direct; Netlify cannot proxy WebSockets) |
 | `VITE_APP_ID` | `1` (sandbox app id from that env) |
 | `VITE_ORG_ID` | `1` |
 
-`netlify.toml` already sets `VITE_MANAGEMENT_API_URL=/mgmt-api`. The build generates `public/_redirects` so `/mgmt-api` proxies to `https://api.<VITE_ENV_HANDLE>.dev.cks-env.com`. Override with `MANAGEMENT_API_PROXY_TARGET` if needed.
+`netlify.toml` already sets `VITE_MANAGEMENT_API_URL=/mgmt-api` and `VITE_GAME_API_HTTP_URL=/game-api/graphql`. The build generates `public/_redirects` so `/mgmt-api` and `/game-api` proxy to `https://api.<VITE_ENV_HANDLE>.dev.cks-env.com` and `https://game.<VITE_ENV_HANDLE>.dev.cks-env.com`. Override with `MANAGEMENT_API_PROXY_TARGET` / `GAME_API_PROXY_TARGET` if needed.
 
 After changing env vars: **Clear cache and deploy site**, then hard-refresh the browser (or clear site localStorage) so guest auth re-runs against the correct env.
 

@@ -240,7 +240,7 @@ export function useBattleRoyale() {
         eventType: EVENT_DESTROY,
         state: encodeJsonPayload(payload),
         sequenceNumber: eventSeqRef.current++ % 256,
-        distance: 12,
+        distance: 8,
         decayRate: 0,
         uuid: battleActorUuid,
       });

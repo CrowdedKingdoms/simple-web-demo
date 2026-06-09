@@ -11,13 +11,13 @@
   VITE_MANAGEMENT_API_URL = "/mgmt-api"
   VITE_MANAGEMENT_GRAPHQL_URL = "/mgmt-api/graphql"
   VITE_ENV_HANDLE = "e-zt0psk82q3bi"
-  VITE_GAME_API_HTTP_URL = "https://game.e-zt0psk82q3bi.dev.cks-env.com/graphql"
+  VITE_GAME_API_HTTP_URL = "/game-api/graphql"
   VITE_GAME_API_WS_URL = "wss://game.e-zt0psk82q3bi.dev.cks-env.com/graphql"
   VITE_APP_ID = "1"
   VITE_ORG_ID = "1"
 
-# /mgmt-api proxy is generated into public/_redirects at build time (generate-netlify-redirects.sh).
-# SPA fallback only — do not add /mgmt-api here or it will override the generated proxy.
+# /mgmt-api and /game-api proxies are generated into public/_redirects at build time.
+# SPA fallback only — do not add those paths here or they will override the generated proxies.
 [[redirects]]
   from = "/*"
   to = "/index.html"
