@@ -256,7 +256,7 @@ export default defineConfig({
     // Dev proxy: remote mgmt-api CORS only allows app.dev.*, not localhost.
     proxy: {
       '/mgmt-api': {
-        target: 'https://api.dev.crowdedkingdoms.com',
+        target: 'https://api.e-zt0psk82q3bi.dev.cks-env.com',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/mgmt-api/, ''),
         secure: true,

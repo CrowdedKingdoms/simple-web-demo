@@ -10,11 +10,11 @@ export const MANAGEMENT_GRAPHQL_URL =
 
 export const GAME_HTTP_URL =
   import.meta.env.VITE_GAME_API_HTTP_URL ??
-  'https://game.dev1.dev.cks-env.com/graphql';
+  'https://game.e-zt0psk82q3bi.dev.cks-env.com/graphql';
 
 export const GAME_WS_URL =
   import.meta.env.VITE_GAME_API_WS_URL ??
-  'wss://game.dev1.dev.cks-env.com/graphql';
+  'wss://game.e-zt0psk82q3bi.dev.cks-env.com/graphql';
 
 export const APP_ID = import.meta.env.VITE_APP_ID ?? '1';
 export const ORG_ID = import.meta.env.VITE_ORG_ID ?? '1';
