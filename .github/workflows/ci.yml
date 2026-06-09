@@ -32,6 +32,10 @@ jobs:
             CrowdyJS/package-lock.json
             simple-web-demo/package-lock.json
 
+      - name: Install GraphQL schemas for CrowdyJS codegen
+        run: bash scripts/install-crowdy-schemas.sh
+        working-directory: simple-web-demo
+
       - name: Build CrowdyJS
         run: npm ci && npm run build
         working-directory: CrowdyJS
