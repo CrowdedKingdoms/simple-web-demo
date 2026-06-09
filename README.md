@@ -99,6 +99,26 @@ CKS maintainers with the monorepo can refresh vendored schemas:
 
 Optional Netlify env vars: `CROWDYJS_REPO`, `CROWDYJS_REF`.
 
+### Netlify multiplayer (required env vars)
+
+`Forbidden resource` in the browser console almost always means **management and game APIs point at different CKS environments**, or the app is not linked on that environment.
+
+In **Site configuration → Environment variables** (scoped to **Build**), set all of these to the same devbox (from your CKS environment page):
+
+| Variable | Example |
+| --- | --- |
+| `VITE_ENV_HANDLE` | `e-zt0psk82q3bi` |
+| `VITE_GAME_API_HTTP_URL` | `https://game.e-zt0psk82q3bi.dev.cks-env.com/graphql` |
+| `VITE_GAME_API_WS_URL` | `wss://game.e-zt0psk82q3bi.dev.cks-env.com/graphql` |
+| `VITE_APP_ID` | `1` (sandbox app id from that env) |
+| `VITE_ORG_ID` | `1` |
+
+`netlify.toml` already sets `VITE_MANAGEMENT_API_URL=/mgmt-api`. The build generates `public/_redirects` so `/mgmt-api` proxies to `https://api.<VITE_ENV_HANDLE>.dev.cks-env.com`. Override with `MANAGEMENT_API_PROXY_TARGET` if needed.
+
+After changing env vars: **Clear cache and deploy site**, then hard-refresh the browser (or clear site localStorage) so guest auth re-runs against the correct env.
+
+Confirm in the CKS console that **App 1** is linked to the environment and `runtime_status` is **active**.
+
 For non-Netlify static hosts, build with direct API URLs (no `/mgmt-api` proxy):
 
 ```bash
