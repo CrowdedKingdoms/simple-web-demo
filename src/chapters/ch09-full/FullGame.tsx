@@ -1,17 +1,20 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { preserveConfigSearch } from '@/config/demoConfig';
 import { DemoPane } from '@/components/DemoPane';
 import { StatusPanel } from '@/components/StatusPanel';
 import { useGameDemo } from '@/game/useGameDemo';
 import { CrowdySession } from '@/game/session/CrowdySession';
 
 export function FullGame() {
+  const location = useLocation();
+  const search = preserveConfigSearch(location.search);
   const session = CrowdySession.getInstance();
   const game = useGameDemo('full');
 
   return (
     <div className="play-layout">
       <header className="play-header">
-        <Link to="/">← Tutorial</Link>
+        <Link to={{ pathname: '/', search }}>← Tutorial</Link>
         <h1>Collaborative Canvas</h1>
         <p>Paint together. Push the viewport from the edges. Forever.</p>
       </header>

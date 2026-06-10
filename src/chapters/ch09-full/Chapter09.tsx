@@ -1,12 +1,15 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ChapterShell } from '@/chapters/ChapterShell';
 import { getChapter } from '@/chapters/registry';
+import { preserveConfigSearch } from '@/config/demoConfig';
 
 export function Chapter09() {
   const chapter = getChapter(9)!;
+  const location = useLocation();
+  const search = preserveConfigSearch(location.search);
 
   const checks = [
-    { id: 'play', label: 'Full game available at /play', passed: true },
+    { id: 'play', label: 'Full canvas game available at /canvas', passed: true },
     { id: 'docs', label: 'Documentation complete', passed: true },
   ];
 
@@ -31,16 +34,20 @@ export function Chapter09() {
       }
       demo={
         <div className="connect-demo">
-          <Link to="/play" className="play-link big">
-            Launch full game →
+          <p>
+            Configure your env in the bar above, then use <strong>Launch Canvas</strong>.
+          </p>
+          <Link to={{ pathname: '/canvas', search }} className="play-link big">
+            Open collaborative canvas →
           </Link>
         </div>
       }
     >
       <p>
-        Every chapter added one slice. The full game at <Link to="/play">/play</Link>{' '}
-        combines them: move with your mouse, paint with click, scroll at edges, and
-        coordinate viewport pushes with other players.
+        Every chapter added one slice. The full canvas at{' '}
+        <Link to={{ pathname: '/canvas', search }}>/canvas</Link> combines them:
+        move with your mouse, paint with click, scroll at edges, and coordinate
+        viewport pushes with other players.
       </p>
       <p>
         The tutorial docs in <code>cks-docs/docs-build-a-game/</code> mirror each

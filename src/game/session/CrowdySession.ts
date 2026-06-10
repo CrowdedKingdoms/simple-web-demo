@@ -6,13 +6,12 @@ import {
   type UdpNotification,
 } from '@crowdedkingdomstudios/crowdyjs';
 import {
-  APP_ID,
-  ENV_HANDLE,
-  GAME_HTTP_URL,
-  GAME_WS_URL,
-  MANAGEMENT_GRAPHQL_URL,
-} from '@/config';
+  configFingerprint,
+  getActiveDemoConfig,
+  type DemoConfig,
+} from '@/config/demoConfig';
 import { ensureEnvScope, envScopedKey } from '@/game/envScope';
+import { checkConnectivityForConfig, type ConnectivityStatus } from '@/game/session/connectivity';
 import { voxelToCell } from '@/game/world/coordinates';
 import { voxelStateToRgba } from '@/game/world/VoxelStore';
 import type { ActorPose } from '@/game/world/actorState';
@@ -44,12 +43,7 @@ export interface SessionUser {
   gamertag?: string;
 }
 
-export interface ConnectivityStatus {
-  managementOk: boolean | null;
-  gameOk: boolean | null;
-  managementError?: string;
-  gameError?: string;
-}
+export type { ConnectivityStatus };
 
 function guestCredsKey(): string {
   return envScopedKey('cks-canvas-guest-creds');
@@ -62,7 +56,8 @@ export interface GuestCredentials {
 
 export class CrowdySession {
   private static instance: CrowdySession | null = null;
-  private static activeEnvHandle: string | null = null;
+  private static activeFingerprint: string | null = null;
+  readonly config: DemoConfig;
   readonly client: CrowdyClient;
   readonly actorUuid: string;
   private _user: SessionUser | null = null;
@@ -72,15 +67,16 @@ export class CrowdySession {
   private eventListeners = new Set<(msg: string) => void>();
   private notificationHandlers = new Map<string, Set<(n: UdpNotification) => void>>();
 
-  private constructor() {
+  private constructor(config: DemoConfig) {
+    this.config = config;
     ensureEnvScope();
     // GitHub CrowdyJS (Netlify build) resolves endpoint as httpUrl || graphqlEndpoint,
     // so managementUrl must include /graphql — not just the root /mgmt-api path.
     this.client = createCrowdyClient({
-      managementUrl: MANAGEMENT_GRAPHQL_URL,
-      managementGraphqlEndpoint: MANAGEMENT_GRAPHQL_URL,
-      httpUrl: GAME_HTTP_URL,
-      wsUrl: GAME_WS_URL,
+      managementUrl: config.managementGraphqlUrl,
+      managementGraphqlEndpoint: config.managementGraphqlUrl,
+      httpUrl: config.gameHttpUrl,
+      wsUrl: config.gameWsUrl,
       tokenStore: new BrowserLocalStorageTokenStore(envScopedKey('cks-canvas-token')),
       realtime: { retryAttempts: 8, waitTimeoutMs: 5000 },
     });
@@ -88,15 +84,21 @@ export class CrowdySession {
   }
 
   static getInstance(): CrowdySession {
+    const config = getActiveDemoConfig();
+    const fingerprint = configFingerprint(config);
     ensureEnvScope();
     if (
       !CrowdySession.instance ||
-      CrowdySession.activeEnvHandle !== ENV_HANDLE
+      CrowdySession.activeFingerprint !== fingerprint
     ) {
-      CrowdySession.instance = new CrowdySession();
-      CrowdySession.activeEnvHandle = ENV_HANDLE;
+      CrowdySession.instance = new CrowdySession(config);
+      CrowdySession.activeFingerprint = fingerprint;
     }
     return CrowdySession.instance;
+  }
+
+  get appId(): string {
+    return this.config.appId;
   }
 
   get user(): SessionUser | null {
@@ -123,35 +125,7 @@ export class CrowdySession {
   }
 
   async checkConnectivity(): Promise<ConnectivityStatus> {
-    const result: ConnectivityStatus = {
-      managementOk: null,
-      gameOk: null,
-    };
-    try {
-      const mgmtRes = await fetch(MANAGEMENT_GRAPHQL_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: '{ __typename }' }),
-      });
-      result.managementOk = mgmtRes.ok;
-      if (!mgmtRes.ok) result.managementError = `HTTP ${mgmtRes.status}`;
-    } catch (e) {
-      result.managementOk = false;
-      result.managementError = e instanceof Error ? e.message : String(e);
-    }
-    try {
-      const gameRes = await fetch(GAME_HTTP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: '{ __typename }' }),
-      });
-      result.gameOk = gameRes.ok;
-      if (!gameRes.ok) result.gameError = `HTTP ${gameRes.status}`;
-    } catch (e) {
-      result.gameOk = false;
-      result.gameError = e instanceof Error ? e.message : String(e);
-    }
-    return result;
+    return checkConnectivityForConfig(this.config);
   }
 
   private loadGuestCreds(): GuestCredentials | null {
@@ -258,7 +232,7 @@ export class CrowdySession {
   }
 
   async bootstrap(): Promise<{ udpConnected: boolean; minVersion?: string }> {
-    const boot = await this.client.serverStatus.gameClientBootstrap(APP_ID);
+    const boot = await this.client.serverStatus.gameClientBootstrap(this.appId);
     const connected = boot.udpProxyConnectionStatus?.connected ?? false;
     this.log(`Bootstrap OK — UDP connected: ${connected}`);
     const min = boot.versionInfo?.minimumClientVersion;
@@ -324,7 +298,7 @@ export class CrowdySession {
     uuid?: string;
   }): Promise<boolean> {
     return this.client.udp.sendActorUpdate({
-      appId: APP_ID,
+      appId: this.appId,
       chunk: input.chunk,
       uuid: input.uuid ?? this.actorUuid,
       state: input.state,
@@ -341,7 +315,7 @@ export class CrowdySession {
     await postLocalPresence(this.actorUuid, pose);
     try {
       await this.client.udp.sendVoxelUpdate({
-        appId: APP_ID,
+        appId: this.appId,
         chunk: PRESENCE_CHUNK,
         uuid: this.actorUuid,
         voxel: presenceLocationForUuid(this.actorUuid),
@@ -361,7 +335,7 @@ export class CrowdySession {
     const merged = new Map<string, PresenceActor>();
     try {
       const result = await this.client.voxels.listByDistance({
-        appId: APP_ID,
+        appId: this.appId,
         centerCoordinate: PRESENCE_CHUNK,
         maxDistance: 1,
       });
@@ -411,7 +385,7 @@ export class CrowdySession {
       await postLocalPaint(input.cell);
     }
     return this.client.udp.sendVoxelUpdate({
-      appId: APP_ID,
+      appId: this.appId,
       chunk: input.chunk,
       uuid: this.actorUuid,
       voxel: input.voxel,
@@ -437,7 +411,7 @@ export class CrowdySession {
     uuid?: string;
   }): Promise<boolean> {
     return this.client.udp.sendClientEvent({
-      appId: APP_ID,
+      appId: this.appId,
       chunk: input.chunk,
       uuid: input.uuid ?? this.actorUuid,
       eventType: input.eventType,
@@ -454,7 +428,7 @@ export class CrowdySession {
     onCell: (cellX: number, cellY: number, r: number, g: number, b: number, a: number, voxelType: number) => void,
   ): Promise<number> {
     const result = await this.client.voxels.listByDistance({
-      appId: APP_ID,
+      appId: this.appId,
       centerCoordinate: { x: String(centerChunkX), y: String(centerChunkY), z: '0' },
       maxDistance: 3,
     });

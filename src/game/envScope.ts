@@ -1,29 +1,25 @@
+import {
+  getActiveDemoConfig,
+  getEnvHandleFromConfig,
+} from '@/config/demoConfig';
+
 const ENV_MARKER_KEY = 'cks-demo-env-handle';
-const DEFAULT_GAME_HTTP =
-  'https://game.e-zt0psk82q3bi.dev.cks-env.com/graphql';
-
-/** Derive env slug from game URL (e.g. game.e-zt0psk82q3bi.dev.cks-env.com → e-zt0psk82q3bi). */
-export function resolveEnvHandle(): string {
-  const explicit = import.meta.env.VITE_ENV_HANDLE?.trim();
-  if (explicit) return explicit;
-  const gameHttp =
-    import.meta.env.VITE_GAME_API_HTTP_URL ?? DEFAULT_GAME_HTTP;
-  const m = gameHttp.match(/game\.([a-z0-9-]+)\.dev\.cks-env\.com/i);
-  return m?.[1] ?? 'default';
-}
-
-export const ENV_HANDLE = resolveEnvHandle();
 
 const SCOPED_PREFIXES = [
   'cks-canvas-token',
   'cks-canvas-guest-creds',
   'cks-battle-actor-uuid',
   'cks-pilot-color-id',
+  'cks-tank-actor-uuid',
+  'cks-tank-color-hex',
 ];
 
-/** Namespaced localStorage key — isolates sessions per CKS environment. */
+export function resolveEnvHandle(): string {
+  return getEnvHandleFromConfig(getActiveDemoConfig());
+}
+
 export function envScopedKey(base: string): string {
-  return `${base}:${ENV_HANDLE}`;
+  return `${base}:${resolveEnvHandle()}`;
 }
 
 function clearLegacyUnscopedKeys(): void {
@@ -38,23 +34,23 @@ function clearLegacyUnscopedKeys(): void {
 }
 
 /**
- * When the configured game/mgmt URLs change, drop cached tokens and battle ids
+ * When the configured game/mgmt URLs change, drop cached tokens and actor ids
  * from the previous environment so UDP multiplayer can reconnect cleanly.
  */
 export function ensureEnvScope(): void {
   if (typeof localStorage === 'undefined') return;
+  const handle = resolveEnvHandle();
   try {
     const prev = localStorage.getItem(ENV_MARKER_KEY);
-    if (prev && prev !== ENV_HANDLE) {
+    if (prev && prev !== handle) {
       for (const base of SCOPED_PREFIXES) {
         localStorage.removeItem(envScopedKey(base));
       }
       clearLegacyUnscopedKeys();
     } else if (!prev) {
-      // First run with env scoping — remove old unscoped keys from prior builds.
       clearLegacyUnscopedKeys();
     }
-    localStorage.setItem(ENV_MARKER_KEY, ENV_HANDLE);
+    localStorage.setItem(ENV_MARKER_KEY, handle);
   } catch {
     // ignore
   }

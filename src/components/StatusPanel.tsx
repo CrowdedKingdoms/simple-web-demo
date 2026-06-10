@@ -1,4 +1,5 @@
-import { CONFIG_DISPLAY, DOCS_BASE } from '@/config';
+import { DOCS_BASE } from '@/config';
+import { useDemoConfig } from '@/context/DemoConfigContext';
 
 interface StatusPanelProps {
   managementOk?: boolean | null;
@@ -14,6 +15,7 @@ interface StatusPanelProps {
 }
 
 export function StatusPanel(props: StatusPanelProps) {
+  const { configDisplay } = useDemoConfig();
   const {
     managementOk,
     gameOk,
@@ -36,9 +38,9 @@ export function StatusPanel(props: StatusPanelProps) {
         <dt>Game API</dt>
         <dd className={statusClass(gameOk)}>{statusText(gameOk)}</dd>
         <dt>AppId</dt>
-        <dd>{CONFIG_DISPLAY.AppId}</dd>
+        <dd>{configDisplay.AppId}</dd>
         <dt>OrgId</dt>
-        <dd>{CONFIG_DISPLAY.OrgId}</dd>
+        <dd>{configDisplay.OrgId}</dd>
         {userEmail !== undefined && (
           <>
             <dt>User</dt>

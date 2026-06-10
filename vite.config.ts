@@ -23,49 +23,6 @@ interface DevPaintCell {
 const devPresence = new Map<string, DevPresence>();
 const devPaint = new Map<string, DevPaintCell>();
 
-interface DevBattlePeer {
-  uuid: string;
-  colorId?: string;
-  ship: {
-    worldX: number;
-    worldY: number;
-    worldZ: number;
-    yaw: number;
-    pitch: number;
-    hp: number;
-    alive: boolean;
-    kills: number;
-  };
-  updatedAt: number;
-}
-
-const devBattle = new Map<string, DevBattlePeer>();
-
-interface DevBattleFire {
-  id: string;
-  ownerUuid: string;
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  vz: number;
-  firedAt: number;
-}
-
-const devBattleFires: DevBattleFire[] = [];
-
-interface DevBattleDestroy {
-  targetUuid: string;
-  x: number;
-  y: number;
-  z: number;
-  color: string;
-  destroyedAt: number;
-}
-
-const devBattleDestroys: DevBattleDestroy[] = [];
-
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -164,147 +121,12 @@ function devPresencePlugin(): Plugin {
 
         sendJson(res, 405, { error: 'method not allowed' });
       });
-
-      server.middlewares.use('/collab/battle', async (req, res) => {
-        if (req.method === 'GET') {
-          const now = Date.now();
-          for (const [uuid, peer] of devBattle) {
-            if (now - peer.updatedAt > 10_000) devBattle.delete(uuid);
-          }
-          sendJson(res, 200, [...devBattle.values()]);
-          return;
-        }
-
-        if (req.method === 'POST') {
-          try {
-            const body = (await readJsonBody(req)) as DevBattlePeer;
-            if (
-              !body ||
-              typeof body.uuid !== 'string' ||
-              typeof body.ship?.worldX !== 'number' ||
-              typeof body.ship?.worldZ !== 'number'
-            ) {
-              sendJson(res, 400, { error: 'invalid battle presence' });
-              return;
-            }
-            devBattle.set(body.uuid, { ...body, updatedAt: Date.now() });
-            sendJson(res, 200, { ok: true });
-          } catch (error) {
-            sendJson(res, 500, {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-          return;
-        }
-
-        sendJson(res, 405, { error: 'method not allowed' });
-      });
-
-      server.middlewares.use('/collab/battle-fire', async (req, res) => {
-        const pruneFires = () => {
-          const now = Date.now();
-          while (devBattleFires.length > 0 && now - devBattleFires[0]!.firedAt > 2_500) {
-            devBattleFires.shift();
-          }
-        };
-
-        if (req.method === 'GET') {
-          pruneFires();
-          sendJson(res, 200, devBattleFires);
-          return;
-        }
-
-        if (req.method === 'POST') {
-          try {
-            const body = (await readJsonBody(req)) as DevBattleFire;
-            if (
-              !body ||
-              typeof body.id !== 'string' ||
-              typeof body.ownerUuid !== 'string' ||
-              typeof body.x !== 'number' ||
-              typeof body.vx !== 'number'
-            ) {
-              sendJson(res, 400, { error: 'invalid battle fire' });
-              return;
-            }
-            devBattleFires.push({
-              id: body.id,
-              ownerUuid: body.ownerUuid,
-              x: body.x,
-              y: body.y ?? 0,
-              z: body.z ?? 0,
-              vx: body.vx,
-              vy: body.vy ?? 0,
-              vz: body.vz ?? 0,
-              firedAt: body.firedAt ?? Date.now(),
-            });
-            pruneFires();
-            while (devBattleFires.length > 120) devBattleFires.shift();
-            sendJson(res, 200, { ok: true });
-          } catch (error) {
-            sendJson(res, 500, {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-          return;
-        }
-
-        sendJson(res, 405, { error: 'method not allowed' });
-      });
-
-      server.middlewares.use('/collab/battle-destroy', async (req, res) => {
-        const pruneDestroys = () => {
-          const now = Date.now();
-          while (
-            devBattleDestroys.length > 0 &&
-            now - devBattleDestroys[0]!.destroyedAt > 4_000
-          ) {
-            devBattleDestroys.shift();
-          }
-        };
-
-        if (req.method === 'GET') {
-          pruneDestroys();
-          sendJson(res, 200, devBattleDestroys);
-          return;
-        }
-
-        if (req.method === 'POST') {
-          try {
-            const body = (await readJsonBody(req)) as DevBattleDestroy;
-            if (
-              !body ||
-              typeof body.targetUuid !== 'string' ||
-              typeof body.x !== 'number' ||
-              typeof body.color !== 'string'
-            ) {
-              sendJson(res, 400, { error: 'invalid battle destroy' });
-              return;
-            }
-            devBattleDestroys.push({
-              targetUuid: body.targetUuid,
-              x: body.x,
-              y: body.y ?? 0,
-              z: body.z ?? 0,
-              color: body.color,
-              destroyedAt: body.destroyedAt ?? Date.now(),
-            });
-            pruneDestroys();
-            while (devBattleDestroys.length > 48) devBattleDestroys.shift();
-            sendJson(res, 200, { ok: true });
-          } catch (error) {
-            sendJson(res, 500, {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-          return;
-        }
-
-        sendJson(res, 405, { error: 'method not allowed' });
-      });
     },
   };
 }
+
+const defaultEnvHandle =
+  process.env.VITE_ENV_HANDLE?.trim() || 'e-zt0psk82q3bi';
 
 export default defineConfig({
   plugins: [react(), devPresencePlugin()],
@@ -316,10 +138,9 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    // Dev proxy: remote mgmt-api CORS only allows app.dev.*, not localhost.
     proxy: {
       '/mgmt-api': {
-        target: 'https://api.e-zt0psk82q3bi.dev.cks-env.com',
+        target: `https://api.${defaultEnvHandle}.dev.cks-env.com`,
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/mgmt-api/, ''),
         secure: true,
