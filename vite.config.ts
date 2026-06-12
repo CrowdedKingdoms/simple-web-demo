@@ -2,6 +2,12 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import {
+  forwardNodeRequest,
+  parseProxyTarget,
+  PROXY_GAME_PATH,
+  PROXY_MGMT_PATH,
+} from './scripts/cks-api-proxy-lib.mjs';
 
 interface DevPresence {
   uuid: string;
@@ -44,6 +50,46 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.statusCode = status;
   res.setHeader('content-type', 'application/json');
   res.end(JSON.stringify(payload));
+}
+
+function cksApiProxyPlugin(): Plugin {
+  return {
+    name: 'cks-api-proxy',
+    configureServer(server) {
+      const handleProxy = async (
+        req: IncomingMessage,
+        res: ServerResponse,
+        kind: 'mgmt' | 'game',
+      ) => {
+        if (!req.url) {
+          sendJson(res, 400, { error: 'missing url' });
+          return;
+        }
+        const target = parseProxyTarget(
+          new URL(req.url, 'http://localhost').searchParams.get('target'),
+          kind,
+        );
+        if (!target) {
+          sendJson(res, 400, { error: 'invalid or disallowed target' });
+          return;
+        }
+        try {
+          await forwardNodeRequest(req, res, target);
+        } catch (error) {
+          sendJson(res, 502, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      };
+
+      server.middlewares.use(PROXY_MGMT_PATH, (req, res) => {
+        void handleProxy(req, res, 'mgmt');
+      });
+      server.middlewares.use(PROXY_GAME_PATH, (req, res) => {
+        void handleProxy(req, res, 'game');
+      });
+    },
+  };
 }
 
 function devPresencePlugin(): Plugin {
@@ -125,11 +171,8 @@ function devPresencePlugin(): Plugin {
   };
 }
 
-const defaultEnvHandle =
-  process.env.VITE_ENV_HANDLE?.trim() || 'e-zt0psk82q3bi';
-
 export default defineConfig({
-  plugins: [react(), devPresencePlugin()],
+  plugins: [react(), cksApiProxyPlugin(), devPresencePlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -138,14 +181,6 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    proxy: {
-      '/mgmt-api': {
-        target: `https://api.${defaultEnvHandle}.dev.cks-env.com`,
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/mgmt-api/, ''),
-        secure: true,
-      },
-    },
   },
   test: {
     globals: false,

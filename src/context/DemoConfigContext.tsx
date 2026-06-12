@@ -41,14 +41,12 @@ const DemoConfigContext = createContext<DemoConfigContextValue | null>(null);
 export function DemoConfigProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const config = useMemo(
-    () => parseDemoConfig(location.search),
-    [location.search],
-  );
-
-  useEffect(() => {
-    setActiveDemoConfig(config);
-  }, [config]);
+  const config = useMemo(() => {
+    const parsed = parseDemoConfig(location.search);
+    // Sync before any CrowdySession.getInstance() on first render (useEffect is too late).
+    setActiveDemoConfig(parsed);
+    return parsed;
+  }, [location.search]);
 
   const [connectivity, setConnectivity] = useState<ConnectivityStatus>({
     managementOk: null,

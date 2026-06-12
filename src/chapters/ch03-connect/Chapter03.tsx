@@ -16,6 +16,7 @@ export function Chapter03() {
     setError('');
     try {
       await session.ensureGuestAuth();
+      await session.ensureAppAccess();
       const boot = await session.bootstrap();
       setBootOk(true);
       const connected = await session.connectUdp();

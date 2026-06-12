@@ -35,7 +35,21 @@ export function DemoConfigBar() {
       ? 'Enter env handle'
       : connectivity.managementOk && connectivity.gameOk
         ? 'Connected'
-        : 'Failed';
+        : connectivity.managementOk === false && connectivity.gameOk === false
+          ? 'Mgmt & Game failed'
+          : connectivity.managementOk === false
+            ? 'Mgmt failed'
+            : connectivity.gameOk === false
+              ? 'Game failed'
+              : 'Failed';
+
+  const statusHint = [
+    connectivity.managementError &&
+      `Management: ${connectivity.managementError}`,
+    connectivity.gameError && `Game: ${connectivity.gameError}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const statusClass =
     checking || !isComplete
@@ -107,7 +121,11 @@ export function DemoConfigBar() {
         >
           {copied ? 'Copied!' : 'Copy link'}
         </button>
-        <span className={`config-status ${statusClass}`} data-testid="config-status">
+        <span
+          className={`config-status ${statusClass}`}
+          data-testid="config-status"
+          title={statusHint || undefined}
+        >
           {statusLabel}
         </span>
       </div>

@@ -26,6 +26,7 @@ import {
   TANK_SPAWN_POINTS,
   TANK_SPEED,
 } from '@/game/tanks/constants';
+import { notificationMatchesApp } from '@/game/notificationAppId';
 import { getTankActorUuid } from '@/game/tanks/tankActorUuid';
 import {
   decodeTankState,
@@ -223,6 +224,7 @@ export function useTankArena() {
 
     void (async () => {
       await session.ensureGuestAuth();
+      await session.ensureAppAccess();
       await session.bootstrap();
       await session.connectUdp();
       if (cancelled) return;
@@ -231,6 +233,7 @@ export function useTankArena() {
       unsubs.push(
         session.onNotification('ActorUpdateNotification', (n) => {
           if (n.__typename !== 'ActorUpdateNotification') return;
+          if (!notificationMatchesApp(n.appId, session.appId)) return;
           if (n.uuid === tankUuid) return;
           const tank = decodeTankState(n.state);
           if (!tank) return;
@@ -260,6 +263,7 @@ export function useTankArena() {
       unsubs.push(
         session.onNotification('ClientEventNotification', (n) => {
           if (n.__typename !== 'ClientEventNotification') return;
+          if (!notificationMatchesApp(n.appId, session.appId)) return;
           if (n.eventType === EVENT_TANK_FIRE) {
             const payload = decodeJsonPayload<FirePayload>(n.state);
             if (!payload || payload.ownerUuid === tankUuid) return;
@@ -293,6 +297,9 @@ export function useTankArena() {
         getPose: () => tankStateToPose(localTankRef.current),
       });
       actorSenderRef.current.start();
+      // First spatial message to a new chunk can be dropped while grid ACL loads.
+      await actorSenderRef.current.sendNow();
+      await new Promise((r) => setTimeout(r, 1000));
       await actorSenderRef.current.sendNow();
     })();
 

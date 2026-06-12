@@ -1,11 +1,16 @@
 /** Runtime demo configuration — URL params, build defaults, or empty. */
 
+import { buildProxyUrl, toProxiedGraphqlUrl } from '@/config/apiProxy';
+
 export type DemoConfigSource = 'query' | 'build' | 'empty';
 
 export interface DemoConfig {
   envHandle: string;
+  /** Same-origin proxy URL used by the browser for management GraphQL HTTP. */
   managementGraphqlUrl: string;
+  /** Same-origin proxy URL used by the browser for game GraphQL HTTP. */
   gameHttpUrl: string;
+  /** Direct WebSocket URL (cross-origin; game API allows all origins). */
   gameWsUrl: string;
   appId: string;
   orgId: string;
@@ -26,16 +31,30 @@ function deriveEnvHandleFromGameUrl(url?: string): string | null {
   return m?.[1] ?? null;
 }
 
-export function deriveUrlsFromEnvHandle(
+/** Default management API for devbox env handles (`api.<handle>.dev.cks-env.com`). */
+export function managementApiUrlForEnvHandle(envHandle: string): string {
+  const handle = envHandle.trim();
+  if (!handle) return SHARED_MGMT_FALLBACK;
+  return `https://api.${handle}.${DEV_DNS_ROOT}/graphql`;
+}
+
+/** Resolve real upstream HTTPS GraphQL endpoints (not browser proxy paths). */
+export function resolveUpstreamUrls(
   envHandle: string,
   overrides?: { mgmt?: string; gameHttp?: string; gameWs?: string },
-): Pick<DemoConfig, 'managementGraphqlUrl' | 'gameHttpUrl' | 'gameWsUrl'> {
+): {
+  managementGraphqlUrl: string;
+  gameHttpUrl: string;
+  gameWsUrl: string;
+} {
   const handle = envHandle.trim();
   const gameHost = `game.${handle}.${DEV_DNS_ROOT}`;
-  return {
+  // Devbox game-api introspects tokens against the box-local management API
+  // (`api.<handle>.…`), so register/login must use the same plane. Dedicated
+  // environments can override with ?mgmt=https://api.dev.crowdedkingdoms.com/graphql.
+  const upstream = {
     managementGraphqlUrl:
-      overrides?.mgmt?.trim() ||
-      `https://api.${handle}.${DEV_DNS_ROOT}/graphql`,
+      overrides?.mgmt?.trim() || managementApiUrlForEnvHandle(handle),
     gameHttpUrl:
       overrides?.gameHttp?.trim() ||
       `https://${gameHost}/graphql`,
@@ -43,24 +62,57 @@ export function deriveUrlsFromEnvHandle(
       overrides?.gameWs?.trim() ||
       `wss://${gameHost}/graphql`,
   };
+
+  return upstream;
+}
+
+export function deriveUrlsFromEnvHandle(
+  envHandle: string,
+  overrides?: { mgmt?: string; gameHttp?: string; gameWs?: string },
+): Pick<DemoConfig, 'managementGraphqlUrl' | 'gameHttpUrl' | 'gameWsUrl'> {
+  const upstream = resolveUpstreamUrls(envHandle, overrides);
+  return {
+    managementGraphqlUrl: toProxiedGraphqlUrl('mgmt', upstream.managementGraphqlUrl),
+    gameHttpUrl: toProxiedGraphqlUrl('game', upstream.gameHttpUrl),
+    gameWsUrl: upstream.gameWsUrl,
+  };
+}
+
+function upstreamFromBuildEnv(): {
+  managementGraphqlUrl: string;
+  gameHttpUrl: string;
+  gameWsUrl: string;
+} {
+  const mgmtFromEnv = import.meta.env.VITE_MANAGEMENT_GRAPHQL_URL?.trim();
+  const gameHttpFromEnv = import.meta.env.VITE_GAME_API_HTTP_URL?.trim();
+  const gameWsFromEnv = import.meta.env.VITE_GAME_API_WS_URL?.trim();
+
+  if (
+    mgmtFromEnv &&
+    (mgmtFromEnv.startsWith('http://') || mgmtFromEnv.startsWith('https://'))
+  ) {
+    return resolveUpstreamUrls(BUILD_ENV_HANDLE, {
+      mgmt: mgmtFromEnv,
+      gameHttp: gameHttpFromEnv,
+      gameWs: gameWsFromEnv,
+    });
+  }
+
+  return resolveUpstreamUrls(BUILD_ENV_HANDLE, {
+    gameHttp: gameHttpFromEnv?.startsWith('http')
+      ? gameHttpFromEnv
+      : undefined,
+    gameWs: gameWsFromEnv,
+  });
 }
 
 function buildDefaultConfig(): DemoConfig {
-  const mgmtBase =
-    import.meta.env.VITE_MANAGEMENT_API_URL ?? '/mgmt-api';
-  const mgmtGraphql =
-    import.meta.env.VITE_MANAGEMENT_GRAPHQL_URL ??
-    `${mgmtBase.replace(/\/$/, '')}/graphql`;
-
+  const upstream = upstreamFromBuildEnv();
   return {
     envHandle: BUILD_ENV_HANDLE,
-    managementGraphqlUrl: mgmtGraphql,
-    gameHttpUrl:
-      import.meta.env.VITE_GAME_API_HTTP_URL ??
-      `https://game.${BUILD_ENV_HANDLE}.${DEV_DNS_ROOT}/graphql`,
-    gameWsUrl:
-      import.meta.env.VITE_GAME_API_WS_URL ??
-      `wss://game.${BUILD_ENV_HANDLE}.${DEV_DNS_ROOT}/graphql`,
+    managementGraphqlUrl: toProxiedGraphqlUrl('mgmt', upstream.managementGraphqlUrl),
+    gameHttpUrl: toProxiedGraphqlUrl('game', upstream.gameHttpUrl),
+    gameWsUrl: upstream.gameWsUrl,
     appId: import.meta.env.VITE_APP_ID ?? '1',
     orgId: import.meta.env.VITE_ORG_ID ?? '1',
     source: 'build',
@@ -70,7 +122,7 @@ function buildDefaultConfig(): DemoConfig {
 function emptyConfig(): DemoConfig {
   return {
     envHandle: '',
-    managementGraphqlUrl: SHARED_MGMT_FALLBACK,
+    managementGraphqlUrl: buildProxyUrl('mgmt', SHARED_MGMT_FALLBACK),
     gameHttpUrl: '',
     gameWsUrl: '',
     appId: '1',
@@ -90,33 +142,21 @@ export function parseDemoConfig(search: string): DemoConfig {
     return hasBuild ? buildDefaultConfig() : emptyConfig();
   }
 
-  const mgmtOverride = params.get('mgmt')?.trim();
-  const gameHttpOverride = params.get('gh')?.trim();
-  const gameWsOverride = params.get('gw')?.trim();
   const derived = deriveUrlsFromEnvHandle(envHandle, {
-    mgmt: mgmtOverride,
-    gameHttp: gameHttpOverride,
-    gameWs: gameWsOverride,
+    mgmt: params.get('mgmt')?.trim(),
+    gameHttp: params.get('gh')?.trim(),
+    gameWs: params.get('gw')?.trim(),
   });
-
-  let mgmt = derived.managementGraphqlUrl;
-  if (!mgmtOverride && !mgmt.includes(handleInMgmtUrl(envHandle))) {
-    mgmt = SHARED_MGMT_FALLBACK;
-  }
 
   return {
     envHandle,
-    managementGraphqlUrl: mgmt,
+    managementGraphqlUrl: derived.managementGraphqlUrl,
     gameHttpUrl: derived.gameHttpUrl,
     gameWsUrl: derived.gameWsUrl,
     appId: params.get('app')?.trim() || '1',
     orgId: params.get('org')?.trim() || '1',
     source: 'query',
   };
-}
-
-function handleInMgmtUrl(handle: string): string {
-  return `api.${handle}.`;
 }
 
 export function isConfigComplete(config: DemoConfig): boolean {
@@ -154,15 +194,19 @@ export function serializeDemoConfig(
   if (input.appId && input.appId !== '1') params.set('app', input.appId);
   if (input.orgId && input.orgId !== '1') params.set('org', input.orgId);
 
-  const defaults = deriveUrlsFromEnvHandle(input.envHandle);
-  if (
-    input.managementGraphqlUrl &&
-    input.managementGraphqlUrl !== defaults.managementGraphqlUrl
-  ) {
-    params.set('mgmt', input.managementGraphqlUrl);
+  const defaults = resolveUpstreamUrls(input.envHandle);
+  const mgmtUpstream = input.managementGraphqlUrl?.startsWith('/cks-proxy/')
+    ? undefined
+    : input.managementGraphqlUrl;
+  const gameHttpUpstream = input.gameHttpUrl?.startsWith('/cks-proxy/')
+    ? undefined
+    : input.gameHttpUrl;
+
+  if (mgmtUpstream && mgmtUpstream !== defaults.managementGraphqlUrl) {
+    params.set('mgmt', mgmtUpstream);
   }
-  if (input.gameHttpUrl && input.gameHttpUrl !== defaults.gameHttpUrl) {
-    params.set('gh', input.gameHttpUrl);
+  if (gameHttpUpstream && gameHttpUpstream !== defaults.gameHttpUrl) {
+    params.set('gh', gameHttpUpstream);
   }
   if (input.gameWsUrl && input.gameWsUrl !== defaults.gameWsUrl) {
     params.set('gw', input.gameWsUrl);
@@ -179,10 +223,18 @@ export function preserveConfigSearch(search: string): string {
 }
 
 export function configToDisplay(config: DemoConfig): Record<string, string> {
+  const upstream = config.envHandle
+    ? resolveUpstreamUrls(config.envHandle)
+    : {
+        managementGraphqlUrl: SHARED_MGMT_FALLBACK,
+        gameHttpUrl: '',
+        gameWsUrl: '',
+      };
+
   return {
     EnvHandle: config.envHandle,
-    ManagementApiUrl: config.managementGraphqlUrl,
-    GameApiHttpUrl: config.gameHttpUrl,
+    ManagementApiUrl: upstream.managementGraphqlUrl,
+    GameApiHttpUrl: upstream.gameHttpUrl,
     GameApiWsUrl: config.gameWsUrl,
     AppId: config.appId,
     OrgId: config.orgId,
@@ -202,5 +254,5 @@ export function getActiveDemoConfig(): DemoConfig {
 
 export function getEnvHandleFromConfig(config: DemoConfig = activeConfig): string {
   if (config.envHandle) return config.envHandle;
-  return deriveEnvHandleFromGameUrl(config.gameHttpUrl) ?? 'default';
+  return deriveEnvHandleFromGameUrl(config.gameWsUrl) ?? 'default';
 }

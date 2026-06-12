@@ -61,6 +61,7 @@ export class CrowdySession {
   readonly client: CrowdyClient;
   readonly actorUuid: string;
   private _user: SessionUser | null = null;
+  private guestAuthPromise: Promise<SessionUser> | null = null;
   private udpSubscribed = false;
   private presenceSequence = 0;
   private eventLog: string[] = [];
@@ -150,7 +151,23 @@ export class CrowdySession {
     };
   }
 
-  async ensureGuestAuth(): Promise<SessionUser> {
+  /**
+   * Single-flight: React StrictMode mounts effects twice, and two concurrent
+   * registers race (second gets "email exists" → login → a SECOND game token).
+   * The duplicate token then connects UDP with no app scope and Buddy rejects
+   * the app-scoped traffic of the first.
+   */
+  ensureGuestAuth(): Promise<SessionUser> {
+    if (!this.guestAuthPromise) {
+      this.guestAuthPromise = this.doEnsureGuestAuth().catch((e) => {
+        this.guestAuthPromise = null;
+        throw e;
+      });
+    }
+    return this.guestAuthPromise;
+  }
+
+  private async doEnsureGuestAuth(): Promise<SessionUser> {
     await this.client.session.restore();
     if (this.client.session.getToken()) {
       try {
@@ -228,7 +245,75 @@ export class CrowdySession {
     localStorage.removeItem(guestCredsKey());
     void this.client.auth.logout();
     this._user = null;
+    this.guestAuthPromise = null;
     this.log('Guest credentials cleared');
+  }
+
+  /** Grant the free default tier on the box management API before game bootstrap. */
+  async ensureAppAccess(): Promise<void> {
+    const token = this.client.session.getToken();
+    if (!token) {
+      this.log('App access skipped — not authenticated');
+      return;
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+
+    const accessQuery = `
+      query MyAppAccess($appId: BigInt!) {
+        myAppAccess(appId: $appId) { status }
+      }`;
+    const accessRes = await fetch(this.config.managementGraphqlUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: accessQuery,
+        variables: { appId: this.appId },
+      }),
+    });
+    const accessJson = (await accessRes.json()) as {
+      data?: { myAppAccess?: { status?: string } | null };
+    };
+    if (accessJson.data?.myAppAccess?.status === 'active') {
+      this.log(`App access already active for app ${this.appId}`);
+      return;
+    }
+
+    const claimMutation = `
+      mutation ClaimFreeAppAccess($appId: BigInt!) {
+        claimFreeAppAccess(appId: $appId) {
+          appUserAccessId
+          status
+        }
+      }`;
+    const claimRes = await fetch(this.config.managementGraphqlUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: claimMutation,
+        variables: { appId: this.appId },
+      }),
+    });
+    const claimJson = (await claimRes.json()) as {
+      data?: { claimFreeAppAccess?: { status?: string } };
+      errors?: Array<{ message?: string }>;
+    };
+    if (claimJson.errors?.length) {
+      const msg = claimJson.errors.map((e) => e.message).join('; ');
+      if (msg.includes('Cannot query field "claimFreeAppAccess"')) {
+        this.log(
+          'claimFreeAppAccess not on this management API — bootstrap will request entitlements',
+        );
+        return;
+      }
+      this.log(`App access claim failed: ${msg}`);
+      return;
+    }
+    const status = claimJson.data?.claimFreeAppAccess?.status ?? 'unknown';
+    this.log(`App access granted (${status}) for app ${this.appId}`);
   }
 
   async bootstrap(): Promise<{ udpConnected: boolean; minVersion?: string }> {
@@ -263,22 +348,27 @@ export class CrowdySession {
   private async ensureUdpSubscription(): Promise<void> {
     if (this.udpSubscribed) return;
     this.udpSubscribed = true;
-    this.client.udp.subscribe({
-      actorUpdate: (n) => this.dispatch('ActorUpdateNotification', n),
-      voxelUpdate: (n) => this.dispatch('VoxelUpdateNotification', n),
-      clientEvent: (n) => this.dispatch('ClientEventNotification', n),
-      connectionEvent: (n) => {
-        this.dispatch('RealtimeConnectionEvent', n);
-        this.log(`Connection event: ${n.status ?? 'unknown'}`);
+    // CrowdyJS v5: subscriptions are app-scoped. The appId is required so the
+    // game-api only fans out this app's notifications (cross-app isolation).
+    this.client.udp.subscribe(
+      {
+        actorUpdate: (n) => this.dispatch('ActorUpdateNotification', n),
+        voxelUpdate: (n) => this.dispatch('VoxelUpdateNotification', n),
+        clientEvent: (n) => this.dispatch('ClientEventNotification', n),
+        connectionEvent: (n) => {
+          this.dispatch('RealtimeConnectionEvent', n);
+          this.log(`Connection event: ${n.status ?? 'unknown'}`);
+        },
+        genericError: (n) => {
+          this.dispatch('GenericErrorResponse', n);
+          this.log(`UDP error: code ${n.errorCode}`);
+        },
+        actorUpdateResponse: (n) => this.dispatch('ActorUpdateResponse', n),
+        voxelUpdateResponse: (n) => this.dispatch('VoxelUpdateResponse', n),
       },
-      genericError: (n) => {
-        this.dispatch('GenericErrorResponse', n);
-        this.log(`UDP error: code ${n.errorCode}`);
-      },
-      actorUpdateResponse: (n) => this.dispatch('ActorUpdateResponse', n),
-      voxelUpdateResponse: (n) => this.dispatch('VoxelUpdateResponse', n),
-    });
-    this.log('UDP subscription active');
+      this.appId,
+    );
+    this.log(`UDP subscription active (app ${this.appId})`);
   }
 
   private dispatch(typename: string, notification: UdpNotification): void {

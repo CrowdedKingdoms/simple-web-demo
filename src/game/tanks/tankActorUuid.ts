@@ -3,14 +3,26 @@ import { envScopedKey } from '@/game/envScope';
 
 const STORAGE_KEY = () => envScopedKey('cks-tank-actor-uuid');
 
+/** Per-tab storage so two windows/tabs on the same env+app get distinct tank actors. */
+function tabStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function getTankActorUuid(): string {
   if (typeof window === 'undefined') return generateCrowdyUuid();
+  const storage = tabStorage();
+  if (!storage) return generateCrowdyUuid();
   try {
     const key = STORAGE_KEY();
-    let id = localStorage.getItem(key);
+    let id = storage.getItem(key);
     if (!id) {
       id = generateCrowdyUuid();
-      localStorage.setItem(key, id);
+      storage.setItem(key, id);
     }
     return id;
   } catch {
@@ -19,9 +31,10 @@ export function getTankActorUuid(): string {
 }
 
 export function clearTankActorUuid(): void {
-  if (typeof window === 'undefined') return;
+  const storage = tabStorage();
+  if (!storage) return;
   try {
-    localStorage.removeItem(STORAGE_KEY());
+    storage.removeItem(STORAGE_KEY());
   } catch {
     // ignore
   }

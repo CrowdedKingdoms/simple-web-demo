@@ -22,9 +22,9 @@ Enter your **env handle** (devbox slug), App ID, and Org ID in the top config ba
 
 Use **Copy link** to share with teammates — they land on the same dedicated dev environment without re-entering URLs.
 
-Optional query overrides: `mgmt`, `gh` (game HTTP), `gw` (game WebSocket).
+Optional query overrides: `mgmt`, `gh` (game HTTP), `gw` (game WebSocket). By default, auth/register uses the **box-local** management API (`https://api.<env-handle>.dev.cks-env.com/graphql`) so tokens validate on that environment's game-api. Pass `?mgmt=https://api.dev.crowdedkingdoms.com/graphql` only for dedicated environments that use the shared dev management plane.
 
-When `env` is in the URL, the app uses **absolute** API URLs (required for shared links on Netlify when the build-time env differs).
+When `env` is in the URL, HTTP GraphQL calls go through a **same-origin proxy** (`/cks-proxy/mgmt` and `/cks-proxy/game`) so any devbox or dedicated environment works from localhost or a deployed demo without CORS patches. WebSockets still connect directly to `wss://game.{handle}.…`.
 
 ## Layout options
 
@@ -52,7 +52,7 @@ npm run dev
 
 Open http://127.0.0.1:5180 — enter your env handle in the config bar, work through chapters 1–9, then **Launch Canvas** or **Launch Tanks**.
 
-Local dev proxies the Management API through `/mgmt-api` when using build-time defaults (no `?env=` in URL). Copy `.env.example` to `.env` to set a default `VITE_ENV_HANDLE`.
+Local dev proxies management and game HTTP GraphQL through `/cks-proxy/*` for any `?env=` handle. Copy `.env.example` to `.env` to set a default `VITE_ENV_HANDLE` when no query params are present.
 
 ## Validate docs + APIs
 
@@ -79,6 +79,12 @@ npm run demo:verify
 | `/canvas` | Full collaborative paint game |
 | `/tanks` | Top-down multiplayer tank arena (up to 4 players) |
 
+## Multiplayer testing (tanks / canvas)
+
+Open **one browser tab or window per player** with the same `?env=` and `?app=` URL. Each tab gets its own tank actor id (`sessionStorage`), so two tabs on the same app see each other. If you only see **Players 1**, hard-refresh both tabs after pulling this fix — an old shared `localStorage` tank id can linger until the tab storage is recreated.
+
+For remote dev (Cursor SSH), use the server address (e.g. `http://40.160.10.31:5180/...`) rather than `localhost` in the embedded browser unless ports are forwarded.
+
 ## Deploy (Netlify / static fork)
 
 Forks deploy **without** the monorepo. Netlify runs `scripts/netlify-build.sh`, which:
@@ -93,12 +99,8 @@ Optional Netlify env vars: `CROWDYJS_REPO`, `CROWDYJS_REF`.
 
 ### Netlify build defaults
 
-Set `VITE_ENV_HANDLE` (and related vars in `netlify.toml`) for the default env when users open the site without query params. Shared links with `?env=other-handle` use absolute API URLs and bypass static `/mgmt-api` / `/game-api` proxies.
+Set `VITE_ENV_HANDLE` in `netlify.toml` for the default env when users open the site without query params. Shared links with `?env=other-handle` use the same dynamic `/cks-proxy/*` Netlify function as local dev.
 
 `Forbidden resource` in the browser console almost always means **management and game APIs point at different CKS environments**, or the app is not linked on that environment.
 
 Confirm in the CKS console that **App 1** is linked to the environment and `runtime_status` is **active**.
-
-### CORS note
-
-If Management API CORS does not allow your Netlify origin for `api.{env}.dev.cks-env.com`, the connectivity check may fail on static deploy. Sharing links among users on the **same** env as the Netlify build-time handle still works via `/mgmt-api` proxy when no `?env=` override is present.

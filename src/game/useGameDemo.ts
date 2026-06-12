@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { notificationMatchesApp } from '@/game/notificationAppId';
 import { CrowdySession } from '@/game/session/CrowdySession';
 import { ActorSender } from '@/game/session/ActorSender';
 import { Viewport } from '@/game/world/Viewport';
@@ -78,11 +79,13 @@ export function useGameDemo(mode: GameMode) {
 
     void (async () => {
       await session.ensureGuestAuth();
+      await session.ensureAppAccess();
       await session.bootstrap();
       await session.connectUdp();
 
       session.onNotification('ActorUpdateNotification', (n) => {
         if (n.__typename !== 'ActorUpdateNotification') return;
+        if (!notificationMatchesApp(n.appId, session.appId)) return;
         if (n.uuid === session.actorUuid) return;
         const pose = decodeActorState(n.state);
         if (!pose) return;
@@ -96,6 +99,7 @@ export function useGameDemo(mode: GameMode) {
 
       session.onNotification('VoxelUpdateNotification', (n) => {
         if (n.__typename !== 'VoxelUpdateNotification') return;
+        if (!notificationMatchesApp(n.appId, session.appId)) return;
         const cell = voxelToCell({
           chunkX: Number(n.chunkX),
           chunkY: Number(n.chunkY),
